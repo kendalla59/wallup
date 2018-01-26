@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Exec=wallup
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name[en_US]=Wallup
+Name=Wallup
+Comment[en_US]=Update wallpaper periodically
+Comment=Update wallpaper periodically

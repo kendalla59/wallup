@@ -1,0 +1,121 @@
+#!/bin/bash
+#
+# wallup
+#   Update wallpaper images on a timed basis.
+
+# This directory contains images to use as desktop wallpaper.
+DEFAULT_WPHOME="$HOME/Pictures/Wallpaper"
+
+# Any files with the following file extensions will be used.
+WPEXTS=(jpg png gif jpeg JPG)
+
+# This is the interval between wallpaper image updates, in seconds.
+WPTIME=$((10 * 60))
+
+# This is the name of the subdirectory to place the images
+# that have been previously selected at random for wallpaper.
+WPSAVE=.wpsave
+
+# Prior to running this script, set the WPHOME environment
+# variable to set a non-default wallpaper folder.
+if [[ -z "$WPHOME" ]]; then
+    if [[ -d "$DEFAULT_WPHOME" ]];  then WPHOME=$DEFAULT_WPHOME
+    elif [[ -d "$HOME/Pictures" ]]; then WPHOME=$HOME/Pictures
+    else                                 WPHOME=$HOME
+    fi
+fi
+
+WPDEST="$WPHOME"/"$WPSAVE"
+if [[ ! -d "$WPDEST" ]]; then
+    mkdir "$WPDEST"
+    if [[ $? != 0 ]]; then
+        echo "Unable to create $WPDEST. Exiting..."
+        exit
+    fi
+fi
+
+WPHIST="$WPDEST"/wallup.log
+WPLOCK="$WPDEST"/.mult-lock
+WPLPID="$WPLOCK"/lock-$$
+
+printf -v WPDATE '%-5d %s %s' $$ $(date +"%D %I:%M%p")
+echo "$WPDATE  Starting wallpaper updater for user $USER." >> "$WPHIST"
+
+# If an old lock file exists, clear it out now.
+if [[ -d "$WPLOCK" ]]; then
+    for oldfile in "$WPLOCK"/*; do
+        if [[ -f "$oldfile" ]]; then
+            echo "$WPDATE  Removing old lock \"$oldfile\"." >> "$WPHIST"
+            rm "$oldfile"
+        fi
+    done
+else
+    mkdir "$WPLOCK"
+fi
+
+# Create a new lock file for this process ID
+touch "$WPLPID"
+
+while true; do
+
+    # Responsiveness to logout or multiple instances is determined
+    # by the WPRESP variable, the time to respond in seconds.
+    WPWAIT=$WPTIME
+    WPRESP=10
+
+    while [[ $WPWAIT -gt 0 ]]; do
+        if [[ ! -f "$WPLPID" ]]; then
+            printf -v WPDATE '%-5d %s %s' $$ $(date +"%D %I:%M%p")
+            echo "$WPDATE  Missing \"$WPLPID\". Exiting..." >> "$WPHIST"
+            exit
+        fi
+
+        sleep $WPRESP
+        WPWAIT=$((WPWAIT - WPRESP))
+
+        if [[ $(ps -C gnome-session-binary -o euser= | grep $USER) == "" ]]; then
+            printf -v WPDATE '%-5d %s %s' $$ $(date +"%D %I:%M%p")
+            echo "$WPDATE  User $USER not logged in. Exiting..." >> "$WPHIST"
+            rm -f "$WPLPID"
+            exit
+        fi
+    done
+    printf -v WPDATE '%-5d %s %s' $$ $(date +"%D %I:%M%p")
+
+    # Randomly select the next wallpaper image.
+    cd "$WPHOME"
+    WPNEXT=$(ls ${WPEXTS[@]/#/"*."} 2> /dev/null | shuf -n 1)
+
+    # If no image was found, reload images from the saved folder.
+    if [[ "$WPNEXT" == "" ]]; then
+        cd "$WPDEST"
+        WPFCNT=$(ls -1 ${WPEXTS[@]/#/"*."} 2> /dev/null | wc -l)
+        echo "$WPDATE  Moving $WPFCNT image files from $WPSAVE back up to $WPHOME." >> "$WPHIST"
+        mv ${WPEXTS[@]/#/"*."} "$WPHOME" 2> /dev/null
+
+        # Now get a random wallpaper image.
+        cd "$WPHOME"
+        WPNEXT=$(ls ${WPEXTS[@]/#/"*."} 2> /dev/null | shuf -n 1)
+
+        # Quit now if there are no images in the wallpaper folder.
+        if [[ "$WPNEXT" == "" ]]; then
+            echo "$WPDATE  No Wallpaper images found in $WPHOME. Exiting..." >> "$WPHIST"
+            rm -f "$WPLPID"
+            exit
+        fi
+    fi
+
+    # If the destination directory has disappeared, exit now.
+    if [[ ! -d "$WPDEST" ]]; then
+        echo "No directory $WPDEST. Exiting..."
+        exit
+    fi
+
+    mv "$WPHOME"/"$WPNEXT" "$WPDEST"
+    WPFILE="$WPDEST"/"$WPNEXT"
+
+
+    echo "$WPDATE  New wallpaper file://$WPFILE" >> "$WPHIST"
+    gsettings set org.gnome.desktop.background picture-uri file://"$WPFILE"
+
+done
