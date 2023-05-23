@@ -16,6 +16,13 @@ WPTIME=$((10 * 60))
 # that have been previously selected at random for wallpaper.
 WPSAVE=.wpsave
 
+# This variable enables two images to be used side-by-side for
+# a dual monitor configuration.
+WPDUAL=false
+#WPDUAL=true
+
+WPCVTS=0
+
 # Prior to running this script, set the WPHOME environment
 # variable to set a non-default wallpaper folder.
 if [[ -z "$WPHOME" ]]; then
@@ -34,12 +41,26 @@ if [[ ! -d "$WPDEST" ]]; then
     fi
 fi
 
+function getdate {
+    printf -v WPDATE '%-5d %s %s' $$ $(date +"%D %I:%M%p")
+}
+getdate
+
 WPHIST="$WPDEST"/wallup.log
 WPLOCK="$WPDEST"/.mult-lock
 WPLPID="$WPLOCK"/lock-$$
 
-printf -v WPDATE '%-5d %s %s' $$ $(date +"%D %I:%M%p")
 echo "$WPDATE  Starting wallpaper updater for user $USER." >> "$WPHIST"
+
+# Check if we can merge two images for the background.
+if $WPDUAL; then
+    hash convert >& /dev/null
+    if [[ $? -ne 0 ]]; then
+        WPDUAL=false
+        echo "$WPDATE  Install \"imagemagick\" for dual displays." >> "$WPHIST"
+	echo "$WPDATE  ->  (sudo apt install imagemagick)" >> "$WPHIST"
+    fi
+fi
 
 # If an old lock file exists, clear it out now.
 if [[ -d "$WPLOCK" ]]; then
@@ -56,33 +77,9 @@ fi
 # Create a new lock file for this process ID
 touch "$WPLPID"
 
-while true; do
+function getnext {
 
-    # Responsiveness to logout or multiple instances is determined
-    # by the WPRESP variable, the time to respond in seconds.
-    WPWAIT=$WPTIME
-    WPRESP=10
-
-    while [[ $WPWAIT -gt 0 ]]; do
-        if [[ ! -f "$WPLPID" ]]; then
-            printf -v WPDATE '%-5d %s %s' $$ $(date +"%D %I:%M%p")
-            echo "$WPDATE  Missing \"$WPLPID\". Exiting..." >> "$WPHIST"
-            exit
-        fi
-
-        sleep $WPRESP
-        WPWAIT=$((WPWAIT - WPRESP))
-
-        if [[ $(ps -C gnome-session-binary -o euser= | grep $USER) == "" ]]; then
-            printf -v WPDATE '%-5d %s %s' $$ $(date +"%D %I:%M%p")
-            echo "$WPDATE  User $USER not logged in. Exiting..." >> "$WPHIST"
-            rm -f "$WPLPID"
-            exit
-        fi
-    done
-    printf -v WPDATE '%-5d %s %s' $$ $(date +"%D %I:%M%p")
-
-    # Randomly select the next wallpaper image.
+    # Randomly select the next wallpaper image(s).
     cd "$WPHOME"
     WPNEXT=$(ls ${WPEXTS[@]/#/"*."} 2> /dev/null | shuf -n 1)
 
@@ -95,7 +92,9 @@ while true; do
 
         # Now get a random wallpaper image.
         cd "$WPHOME"
-        WPNEXT=$(ls ${WPEXTS[@]/#/"*."} 2> /dev/null | shuf -n 1)
+	rm cvt-*.png
+	WPCVTS=0
+	WPNEXT=$(ls ${WPEXTS[@]/#/"*."} 2> /dev/null | shuf -n 1)
 
         # Quit now if there are no images in the wallpaper folder.
         if [[ "$WPNEXT" == "" ]]; then
@@ -110,12 +109,56 @@ while true; do
         echo "No directory $WPDEST. Exiting..."
         exit
     fi
+}
 
-    mv "$WPHOME"/"$WPNEXT" "$WPDEST"
-    WPFILE="$WPDEST"/"$WPNEXT"
+while true; do
 
+    # Responsiveness to logout or multiple instances is determined
+    # by the WPRESP variable, the time to respond in seconds.
+    WPWAIT=$WPTIME
+    WPRESP=10
 
-    echo "$WPDATE  New wallpaper file://$WPFILE" >> "$WPHIST"
+    while [[ $WPWAIT -gt 0 ]]; do
+        if [[ ! -f "$WPLPID" ]]; then
+            getdate
+            echo "$WPDATE  Missing \"$WPLPID\". Exiting..." >> "$WPHIST"
+            exit
+        fi
+
+        sleep $WPRESP
+        WPWAIT=$((WPWAIT - WPRESP))
+
+        if [[ $(ps -C gnome-shell -o euser= | grep $USER) == "" ]]; then
+            getdate
+            echo "$WPDATE  User $USER not logged in. Exiting..." >> "$WPHIST"
+            rm -f "$WPLPID"
+            exit
+        fi
+    done
+    getdate
+
+    ((WPCVTS+=1))
+    WPFILE="$WPDEST"/cvt-$WPCVTS.png
+
+    getnext
+    if $WPDUAL; then
+        WPNEXT1=$WPNEXT
+        mv "$WPHOME"/"$WPNEXT1" "$WPHOME"/"$WPNEXT1".HOLD
+        getnext
+	WPNEXT2=$WPNEXT
+	mv "$WPHOME"/"$WPNEXT1".HOLD "$WPDEST"/"$WPNEXT1"
+        mv "$WPHOME"/"$WPNEXT2" "$WPDEST"
+
+        # Create the merged background image.
+	cd "$WPDEST"
+        convert "$WPNEXT1" "$WPNEXT2" +append "$WPFILE"
+        echo "$WPDATE  New wallpaper file://$WPFILE (from $WPNEXT1 + $WPNEXT2)" >> "$WPHIST"
+    else
+        mv "$WPHOME"/"$WPNEXT" "$WPDEST"
+	WPFILE="$WPDEST"/"$WPNEXT"
+        echo "$WPDATE  New wallpaper file://$WPFILE" >> "$WPHIST"
+    fi
+
     gsettings set org.gnome.desktop.background picture-uri file://"$WPFILE"
 
 done

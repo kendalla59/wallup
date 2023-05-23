@@ -2,7 +2,8 @@
 Bash script to update your gnome session desktop wallpaper periodically.
 
 This script was developed on an Ubuntu desktop (16.04.3 LTS).
-It assumes that your login session will run gnome-session-binary.
+It has most recently been tested on Ubuntu 20.04 and 22.04.
+It assumes that your login session will run gnome-shell.
 You can check this using 'ps' to verify it is running.
 
 I have this configured as follows:
@@ -25,6 +26,12 @@ one time, another random sequence will begin.
 The images change every 10 minutes (10 * 60 seconds). You will need
 to modify the script to change this time interval.
 
+=> Dual Monitors:
+You can edit the wallup script so that the variable WPDUAL is true.
+This will utilize the ImageMagick function "convert" to merge two
+images into a single side-by-side image for both monitors.
+Be sure you have ImageMagick installed: sudo apt install imagemagick
+
 Under normal usage, the script will autostart when you first log
 on to the desktop. Alternatively, you can start the script from
 the command line:
@@ -40,4 +47,4 @@ This script is provided freely and without any license.
 
 Kendall Auel
 January 26, 2018
-
+May 23, 2023
