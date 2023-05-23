@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Exec=wallup
+Exec=/usr/local/bin/wallup
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
