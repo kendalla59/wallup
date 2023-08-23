@@ -151,7 +151,8 @@ while true; do
 
         # Create the merged background image.
 	cd "$WPDEST"
-        convert "$WPNEXT1" "$WPNEXT2" +append "$WPFILE"
+        CVTFLAGS="-background black -gravity center -crop 1920x1080+0+0"
+        convert "$WPNEXT1" "$WPNEXT2" $CVTFLAGS +append "$WPFILE"
         echo "$WPDATE  New wallpaper file://$WPFILE (from $WPNEXT1 + $WPNEXT2)" >> "$WPHIST"
     else
         mv "$WPHOME"/"$WPNEXT" "$WPDEST"
