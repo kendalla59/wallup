@@ -13,7 +13,7 @@ wallup : The bash script is copied to "/usr/local/bin":
 `% sudo cp wallup /usr/local/bin`
 
 wallup.desktop : This file is copied to the autostart directory:  
-`% cp wallup $HOME/.config/autostart`
+`% cp wallup.desktop $HOME/.config/autostart`
 
 By default, this script looks in "$HOME/Pictures/Wallpaper" for
 the wallpaper images. Prior to running the script, you can set the
