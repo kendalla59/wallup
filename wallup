@@ -116,12 +116,15 @@ function getnext {
     fi
 }
 
-while true; do
+# Responsiveness to logout or multiple instances is determined
+# by the WPRESP variable, the time to respond in seconds.
+WPRESP=10
 
-    # Responsiveness to logout or multiple instances is determined
-    # by the WPRESP variable, the time to respond in seconds.
-    WPWAIT=$WPTIME
-    WPRESP=10
+# The first wallpaper image is displayed immediately. Subsequent
+# images are updated every WPTIME seconds (see below, after "done").
+WPWAIT=0
+
+while true; do
 
     while [[ $WPWAIT -gt 0 ]]; do
         if [[ ! -f "$WPLPID" ]]; then
@@ -140,6 +143,8 @@ while true; do
             exit
         fi
     done
+    WPWAIT=$WPTIME
+
     getdate
 
     ((WPCVTS+=1))
