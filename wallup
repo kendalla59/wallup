@@ -12,6 +12,15 @@ WPEXTS=(jpg png gif jpeg JPG)
 # This is the interval between wallpaper image updates, in seconds.
 WPTIME=$((10 * 60))
 
+# The first wallpaper image is displayed after this many seconds.
+# NOTE: Subsequent images are updated every WPTIME seconds.
+WPWAIT=0
+
+# Verify the parameter is an integer, else use the default (above).
+if [ "$1" -eq "$1" ] 2> /dev/null; then
+    WPWAIT=$1
+fi
+
 # This is the name of the subdirectory to place the images
 # that have been previously selected at random for wallpaper.
 WPSAVE=.wpsave
@@ -119,10 +128,6 @@ function getnext {
 # Responsiveness to logout or multiple instances is determined
 # by the WPRESP variable, the time to respond in seconds.
 WPRESP=10
-
-# The first wallpaper image is displayed immediately. Subsequent
-# images are updated every WPTIME seconds (see below, after "done").
-WPWAIT=0
 
 while true; do
 

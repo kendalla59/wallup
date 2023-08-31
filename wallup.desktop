@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
-Exec=/usr/local/bin/wallup
+
+# The parameter is the time in seconds until the first wallpaper update.
+Exec=/usr/local/bin/wallup 120
+
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
