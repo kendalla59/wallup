@@ -27,8 +27,8 @@ WPSAVE=.wpsave
 
 # This variable enables two images to be used side-by-side for
 # a dual monitor configuration.
-WPDUAL=false
-#WPDUAL=true
+#WPDUAL=false
+WPDUAL=true
 
 # These variables are the pixel dimensions of the dual monitors.
 WPMONX=1920
@@ -160,18 +160,24 @@ while true; do
         WPNEXT1=$WPNEXT
         mv "$WPHOME"/"$WPNEXT1" "$WPHOME"/"$WPNEXT1".HOLD
         getnext
-	WPNEXT2=$WPNEXT
-	mv "$WPHOME"/"$WPNEXT1".HOLD "$WPDEST"/"$WPNEXT1"
+        WPNEXT2=$WPNEXT
+        mv "$WPHOME"/"$WPNEXT1".HOLD "$WPDEST"/"$WPNEXT1"
         mv "$WPHOME"/"$WPNEXT2" "$WPDEST"
 
         # Create the merged background image.
-	cd "$WPDEST"
+        cd "$WPDEST"
+        CVTOVRH=cvt-ovr.png
         CVTFLAGS="-resize x${WPMONY}< -gravity center -crop ${WPMONX}x${WPMONY}+0+0"
-        convert "$WPNEXT1" "$WPNEXT2" $CVTFLAGS +append "$WPFILE"
+        cp ../.overhang-blk $CVTOVRH
+        convert "$WPNEXT1" "$CVTOVRH" $CVTFLAGS +append junk1.png
+        convert "$CVTOVRH" "$WPNEXT2" $CVTFLAGS +append junk2.png
+        convert junk1.png junk2.png -append "$WPFILE"
+        rm $CVTOVRH junk1.png junk2.png
+
         echo "$WPDATE  New wallpaper file://$WPFILE (from $WPNEXT1 + $WPNEXT2)" >> "$WPHIST"
     else
         mv "$WPHOME"/"$WPNEXT" "$WPDEST"
-	WPFILE="$WPDEST"/"$WPNEXT"
+        WPFILE="$WPDEST"/"$WPNEXT"
         echo "$WPDATE  New wallpaper file://$WPFILE" >> "$WPHIST"
     fi
 

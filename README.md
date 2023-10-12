@@ -33,11 +33,24 @@ This will utilize the ImageMagick function "convert" to merge two
 images into a single side-by-side image for both monitors.
 Be sure you have ImageMagick installed: `sudo apt install imagemagick`
 
+### Stacked / Offset Dual Monitors
+The branch "overhang" provides support for stacked monitors that
+are offset relative to each other. In this case, the monitors are
+each 1920x1080 stacked vertically, with the top monitor offset
+from the lower monitor by 1055 pixels.
+
+This case is handled using a black rectangle PNG file (1055x1080)
+that is attached to the right of the top monitor wallpaper image,
+and to the left of the bottom monitor wallpaper image. The PNG
+is named overhang-blk.png in this repository, but needs to be
+renamed to ".overhang-blk" in the Wallpaper directory. Note that
+the name begins with a dot and has no extension.
+
 ### Running
 Under normal usage, the script will autostart when you first log
 on to the desktop. Alternatively, you can start the script from
 the command line:  
-`% wallup &`
+`% ./wallup &`
 
 Note that only one wallup script will run at a time. If the script
 detects a newer invocation, the older invocation will terminate itself.
@@ -50,3 +63,4 @@ This script is provided freely and without any license.
 **Kendall Auel**  
 January 26, 2018  
 May 23, 2023
+October 12, 2023
