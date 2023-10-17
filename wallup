@@ -35,7 +35,8 @@ WPMONX=1920
 WPMONY=1080
 
 # This integer is incremented each time "convert" joins two images.
-WPCVTS=0
+WPCVTS=1
+WPCVTF=cvt-
 
 # Prior to running this script, set the WPHOME environment
 # variable to set a non-default wallpaper folder.
@@ -66,13 +67,20 @@ WPLPID="$WPLOCK"/lock-$$
 
 echo "$WPDATE  Starting wallpaper updater for user $USER." >> "$WPHIST"
 
-# Check if we can merge two images for the background.
 if $WPDUAL; then
+    # Check if we can merge two images for the background.
     hash convert >& /dev/null
     if [[ $? -ne 0 ]]; then
         WPDUAL=false
         echo "$WPDATE  Install \"imagemagick\" for dual displays." >> "$WPHIST"
-	echo "$WPDATE  ->  (sudo apt install imagemagick)" >> "$WPHIST"
+        echo "$WPDATE  ->  (sudo apt install imagemagick)" >> "$WPHIST"
+    else
+        # Scan for any existing converted files.
+        WPFILE="$WPDEST"/"${WPCVTF}${WPCVTS}.png"
+        while [[ -f "$WPFILE" ]]; do
+            ((WPCVTS+=1))
+            WPFILE="$WPDEST"/"${WPCVTF}${WPCVTS}.png"
+        done 
     fi
 fi
 
@@ -91,24 +99,32 @@ fi
 # Create a new lock file for this process ID
 touch "$WPLPID"
 
-function getnext {
-
-    # Randomly select the next wallpaper image(s).
+# Randomly select the next wallpaper image to be displayed.
+function getrandom {
     cd "$WPHOME"
     WPNEXT=$(ls ${WPEXTS[@]/#/"*."} 2> /dev/null | shuf -n 1)
+}
 
-    # If no image was found, reload images from the saved folder.
+# Restore all of the previously displayed images back to the home folder.
+function restore {
+    cd "$WPDEST"
+
+    # Clear out the temporary conglomerate image files.
+    WPCVTS=1
+    rm "$WPCVTF"*.png
+
+    # Count the total number of images being moved for diagnostic purposes.
+    WPFCNT=$(ls -1 ${WPEXTS[@]/#/"*."} 2> /dev/null | wc -l)
+    echo "$WPDATE  Moving $WPFCNT image files from $WPSAVE back up to $WPHOME." >> "$WPHIST"
+    mv ${WPEXTS[@]/#/"*."} "$WPHOME" 2> /dev/null
+}
+
+# Get the next wallpaper image to be dislayed.
+function getnext {
+    getrandom
     if [[ "$WPNEXT" == "" ]]; then
-        cd "$WPDEST"
-        WPFCNT=$(ls -1 ${WPEXTS[@]/#/"*."} 2> /dev/null | wc -l)
-        echo "$WPDATE  Moving $WPFCNT image files from $WPSAVE back up to $WPHOME." >> "$WPHIST"
-        mv ${WPEXTS[@]/#/"*."} "$WPHOME" 2> /dev/null
-
-        # Now get a random wallpaper image.
-        cd "$WPHOME"
-	rm cvt-*.png
-	WPCVTS=0
-	WPNEXT=$(ls ${WPEXTS[@]/#/"*."} 2> /dev/null | shuf -n 1)
+        restore
+        getrandom
 
         # Quit now if there are no images in the wallpaper folder.
         if [[ "$WPNEXT" == "" ]]; then
@@ -116,12 +132,6 @@ function getnext {
             rm -f "$WPLPID"
             exit
         fi
-    fi
-
-    # If the destination directory has disappeared, exit now.
-    if [[ ! -d "$WPDEST" ]]; then
-        echo "No directory $WPDEST. Exiting..."
-        exit
     fi
 }
 
@@ -150,12 +160,16 @@ while true; do
     done
     WPWAIT=$WPTIME
 
+    # If the destination directory disappeared while we were waiting, exit now.
+    if [[ ! -d "$WPDEST" ]]; then
+        echo "No directory $WPDEST. Exiting..."
+        exit
+    fi
+
     getdate
 
-    ((WPCVTS+=1))
-    WPFILE="$WPDEST"/cvt-$WPCVTS.png
-
     getnext
+
     if $WPDUAL; then
         WPNEXT1=$WPNEXT
         mv "$WPHOME"/"$WPNEXT1" "$WPHOME"/"$WPNEXT1".HOLD
@@ -165,6 +179,9 @@ while true; do
         mv "$WPHOME"/"$WPNEXT2" "$WPDEST"
 
         # Create the merged background image.
+        WPFILE="$WPDEST"/"${WPCVTF}${WPCVTS}.png"
+        ((WPCVTS+=1))
+
         cd "$WPDEST"
         CVTOVRH=cvt-ovr.png
         CVTFLAGS="-resize x${WPMONY}< -gravity center -crop ${WPMONX}x${WPMONY}+0+0"
