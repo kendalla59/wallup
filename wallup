@@ -27,7 +27,6 @@ WPSAVE=.wpsave
 
 # This variable enables two images to be used side-by-side for
 # a dual monitor configuration.
-#WPDUAL=false
 WPDUAL=true
 
 # These variables are the pixel dimensions of the dual monitors.
@@ -66,6 +65,26 @@ WPLOCK="$WPDEST"/.mult-lock
 WPLPID="$WPLOCK"/lock-$$
 
 echo "$WPDATE  Starting wallpaper updater for user $USER." >> "$WPHIST"
+
+WPXRANDR="$WPHOME"/.screen
+xrandr --query > "$WPXRANDR"
+WPMONCNT=$(grep ' connected' "$WPXRANDR" | wc -l)
+if [[ $WPMONCNT -eq 1 ]]; then
+    WPDUAL=false
+    echo "There is one monitor connected to this system."
+elif [[ $WPMONCNT -eq 2 ]]; then
+    WPDUAL=true
+    echo "There are two monitors connected to this system."
+else
+    echo "There are $WPMONCNT monitors, cannot run wallpaper updater."
+    exit
+fi
+
+WPSCREEN=($(awk '/Screen/ && sub(/.*current /, "") \
+                          && sub(/x /,"") && sub(/,.*/,"")' "$WPXRANDR"))
+echo "Screen is ${WPSCREEN[0]} pixels wide and ${WPSCREEN[1]} pixels tall."
+
+exit
 
 if $WPDUAL; then
     # Check if we can merge two images for the background.
