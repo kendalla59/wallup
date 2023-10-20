@@ -1,0 +1,60 @@
+Multiple Monitor Wallpaper
+
+The command 'xrandr' provides details regarding each monitor
+and the positions of the display areas relative to each other.
+
+The total area spanned by all monitors is reported as a "Screen":
+----
+Screen 0: minimum 16 x 16, current 3840 x 1160, maximum 32767 x 32767
+----
+
+In this case the total current size is 3840x1160.
+SCREENX=3840
+SCREENY=1160
+
+We want to determine the position of each display device within this
+screen area, and also where the blank rectangles are located. There
+are generally two cases: side-by-side, or upper-and-lower.
+
+When rendering the wallpaper image, we will add blank regions
+above/below each of the side-by-side images, then combine the two
+resulting images left/right.
+
+In the case of upper-and-lower, we will add blank regions to the
+left/right of images, then combine the two resulting images top/bottom.
+
+The active monitors are shown as 'connected' in the xrandr report,
+whereas other display inputs are show as 'disconnected'. We are only
+interested in the connected devices.
+
+----
+XWAYLAND0 connected primary 1920x1080+1920+0 (normal left inverted right x axis y axis) 600mm x 340mm
+----
+XWAYLAND1 connected 1920x1080+0+80 (normal left inverted right x axis y axis) 530mm x 300mm
+----
+
+D0XSIZE=1920
+D0YSIZE=1080
+D0XOFFS=1920
+D0YOFFS=0
+
+D1XSIZE=1920
+D1YSIZE=1080
+D1XOFFS=0
+D1YOFFS=80
+
+In this example you can see the displays are side-by-side. That's
+because the offset of the first display is equal to the size of
+the second display:
+
+D0XOFFS == D1XSIZE  (1920 == 1920)
+
+The second display is offset below the first display (80 pixels).
+Subtracting out the display regions from the screen, we get the
+blank regions:
+
+D1XSIZE x D1YOFFS + D1XOFFS + D0YOFFS
+D0XSIZE x D1YOFFS + D1XSIZE + D0YSIZE
+1920 x 80 + 0 + 0  (Above the second display, left of the first)
+1920 x 80 + 1920 + 1080  (Below the first display, right of the second)
+
