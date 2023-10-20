@@ -184,12 +184,14 @@ while true; do
 
         cd "$WPDEST"
         CVTOVRH=cvt-ovr.png
-        CVTFLAGS="-resize x${WPMONY}< -gravity center -crop ${WPMONX}x${WPMONY}+0+0"
+        CVTFLAGS="-resize ${WPMONX}x${WPMONY}^ -gravity center -crop ${WPMONX}x${WPMONY}+0+0"
         cp ../.overhang-blk $CVTOVRH
-        convert "$WPNEXT1" "$CVTOVRH" $CVTFLAGS +append junk1.png
-        convert "$CVTOVRH" "$WPNEXT2" $CVTFLAGS +append junk2.png
-        convert junk1.png junk2.png -append "$WPFILE"
-        rm $CVTOVRH junk1.png junk2.png
+        convert "$WPNEXT1" $CVTFLAGS wall1.png
+        convert "$WPNEXT2" $CVTFLAGS wall2.png
+        convert "$CVTOVRH" wall1.png -append junk1.png
+        convert wall2.png "$CVTOVRH" -append junk2.png
+        convert junk1.png junk2.png +append "$WPFILE"
+        rm $CVTOVRH wall1.png wall2.png junk1.png junk2.png
 
         echo "$WPDATE  New wallpaper file://$WPFILE (from $WPNEXT1 + $WPNEXT2)" >> "$WPHIST"
     else
