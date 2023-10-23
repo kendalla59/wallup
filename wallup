@@ -84,6 +84,17 @@ WPSCREEN=($(awk '/Screen/ && sub(/.*current /, "") \
                           && sub(/x /,"") && sub(/,.*/,"")' "$WPXRANDR"))
 echo "Screen is ${WPSCREEN[0]} pixels wide and ${WPSCREEN[1]} pixels tall."
 
+WPDIMS1=($(awk -v dsp=1 'sub(/.* connected/,"") && sub(/x/," ") && sub(/+/," ") && sub(/+/," "){cnt++} \
+                         (cnt==dsp){if ($1 == "primary") print $2 " " $3 " " $4 " " $5; \
+                         else print $1 " " $2 " " $3 " " $4; exit}' "$WPXRANDR"))
+echo "Monitor1 is ${WPDIMS1[0]} x ${WPDIMS1[1]} + ${WPDIMS1[2]} + ${WPDIMS1[3]}"
+
+if $WPDUAL; then
+    WPDIMS2=($(awk -v dsp=2 'sub(/.* connected/,"") && sub(/x/," ") && sub(/+/," ") && sub(/+/," "){cnt++} \
+                             (cnt==dsp){if ($1 == "primary") print $2 " " $3 " " $4 " " $5; \
+                             else print $1 " " $2 " " $3 " " $4; exit}' "$WPXRANDR"))
+    echo "Monitor2 is ${WPDIMS2[0]} x ${WPDIMS2[1]} + ${WPDIMS2[2]} + ${WPDIMS2[3]}"
+fi
 exit
 
 if $WPDUAL; then
@@ -132,7 +143,7 @@ function restore {
     WPCVTS=1
     rm "$WPCVTF"*.png
 
-    # Count the total number of images being moved for diagnostic purposes.
+    # Count the total number of images being moved (for diagnostic purposes).
     WPFCNT=$(ls -1 ${WPEXTS[@]/#/"*."} 2> /dev/null | wc -l)
     echo "$WPDATE  Moving $WPFCNT image files from $WPSAVE back up to $WPHOME." >> "$WPHIST"
     mv ${WPEXTS[@]/#/"*."} "$WPHOME" 2> /dev/null
