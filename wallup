@@ -54,7 +54,7 @@ fi
 # Pass in a parameter of 0 (initial wait time) to get debug messages.
 function debugmsg {
     if [[ WPWAIT -eq 0 ]]; then
-        echo $1
+        echo "$*"
     fi
 }
 
