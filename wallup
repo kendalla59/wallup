@@ -29,10 +29,6 @@ WPSAVE=.wpsave
 # a dual monitor configuration.
 WPDUAL=true
 
-# These variables are the pixel dimensions of the dual monitors.
-WPMONX=1920
-WPMONY=1080
-
 # This integer is incremented each time "convert" joins two images.
 WPCVTS=1
 WPCVTF=cvt-
@@ -55,6 +51,13 @@ if [[ ! -d "$WPDEST" ]]; then
     fi
 fi
 
+# Pass in a parameter of 0 (initial wait time) to get debug messages.
+function debugmsg {
+    if [[ WPWAIT -eq 0 ]]; then
+        echo $1
+    fi
+}
+
 function getdate {
     printf -v WPDATE '%-5d %s %s' $$ $(date +"%D %I:%M%p")
 }
@@ -72,36 +75,45 @@ xrandr --query > "$WPXRANDR"
 
 WPSCREEN=($(awk '/Screen/ && sub(/.*current /, "") \
                           && sub(/x /,"") && sub(/,.*/,"")' "$WPXRANDR"))
-echo "Screen is ${WPSCREEN[0]} pixels wide and ${WPSCREEN[1]} pixels tall."
+debugmsg "Screen is ${WPSCREEN[0]} pixels wide and ${WPSCREEN[1]} pixels tall."
 
-WPDIMS1=($(awk -v dsp=1 'sub(/.* connected/,"") && sub(/x/," ") && sub(/+/," ") && sub(/+/," "){cnt++} \
+WPDIMS1=($(awk -v dsp=1 'sub(/.* connected/,"") && sub(/\x/," ") && sub(/\+/," ") && sub(/\+/," "){cnt++} \
                          (cnt==dsp){if ($1 == "primary") print $2 " " $3 " " $4 " " $5; \
                          else print $1 " " $2 " " $3 " " $4; exit}' "$WPXRANDR"))
-echo "Monitor1 is ${WPDIMS1[0]} x ${WPDIMS1[1]} + ${WPDIMS1[2]} + ${WPDIMS1[3]}"
+debugmsg "Monitor1 is ${WPDIMS1[0]} x ${WPDIMS1[1]} + ${WPDIMS1[2]} + ${WPDIMS1[3]}"
 
 WPMONCNT=$(grep ' connected' "$WPXRANDR" | wc -l)
 if [[ $WPMONCNT -eq 1 ]]; then
     WPDUAL=false
-    echo "There is only one monitor connected to this system."
+    debugmsg "There is only one monitor connected to this system."
 elif [[ $WPMONCNT -eq 2 ]]; then
     WPDUAL=true
-    echo "There are two monitors connected to this system."
+    debugmsg "There are two monitors connected to this system."
 else
     WPDUAL=false
-    echo "There are $WPMONCNT monitors. Currently, only 1 or 2 monitors"
-    echo "are supported, treating as a single monitor."
+    debugmsg "There are $WPMONCNT monitors. Currently, only 1 or 2 monitors"
+    debugmsg "are supported, treating as a single monitor."
     WPDIMS1[0]=${WPSCREEN[0]}
     WPDIMS1[1]=${WPSCREEN[1]}
 fi
 
 if $WPDUAL; then
-    WPDIMS2=($(awk -v dsp=2 'sub(/.* connected/,"") && sub(/x/," ") && sub(/+/," ") && sub(/+/," "){cnt++} \
+    WPDIMS2=($(awk -v dsp=2 'sub(/.* connected/,"") && sub(/\x/," ") && sub(/\+/," ") && sub(/\+/," "){cnt++} \
                              (cnt==dsp){if ($1 == "primary") print $2 " " $3 " " $4 " " $5; \
                              else print $1 " " $2 " " $3 " " $4; exit}' "$WPXRANDR"))
-    echo "Monitor2 is ${WPDIMS2[0]} x ${WPDIMS2[1]} + ${WPDIMS2[2]} + ${WPDIMS2[3]}"
+    debugmsg "Monitor2 is ${WPDIMS2[0]} x ${WPDIMS2[1]} + ${WPDIMS2[2]} + ${WPDIMS2[3]}"
 
     # Check if the displays are stacked vertically or not.
+    if [[ ${WPDIMS2[1]} -eq ${WPDIMS1[3]} || ${WPDIMS2[0]} -eq ${WPDIMS1[2]} ]]; then
+        # Displays are reversed relative to the screen. Swap the specs.
+        WPDIMSX=(${WPDIMS1[@]})
+        WPDIMS1=(${WPDIMS2[@]})
+        WPDIMS2=(${WPDIMSX[@]})
+        debugmsg "Reversed: ${WPDIMS1[@]} - ${WPDIMS2[@]}"
+    fi
+
     if [[ ${WPDIMS1[1]} -eq ${WPDIMS2[3]} ]]; then
+        # Vertically stacked, display 1 is above display 2.
         WPSTACKED=true
         # Calculate the blank areas left/right of the monitors.
         WPXXOFS=$((${WPDIMS1[0]} + ${WPDIMS1[2]}))
@@ -112,18 +124,8 @@ if $WPDUAL; then
         WPXOVER=$((${WPSCREEN[0]} - $WPXXOFS))
         WPB3=(${WPDIMS2[2]} ${WPDIMS2[1]})
         WPB4=($WPXOVER ${WPDIMS2[1]})
-    elif [[ ${WPDIMS2[1]} -eq ${WPDIMS1[3]} ]]; then
-        WPSTACKED=true
-        # Calculate the blank areas left/right of the monitors.
-        WPXXOFS=$((${WPDIMS2[0]} + ${WPDIMS2[2]}))
-        WPXOVER=$((${WPSCREEN[0]} - $WPXXOFS))
-        WPB1=(${WPDIMS2[2]} ${WPDIMS2[1]})
-        WPB2=($WPXOVER ${WPDIMS2[1]})
-        WPXXOFS=$((${WPDIMS1[0]} + ${WPDIMS1[2]}))
-        WPXOVER=$((${WPSCREEN[0]} - $WPXXOFS))
-        WPB3=(${WPDIMS1[2]} ${WPDIMS1[1]})
-        WPB4=($WPXOVER ${WPDIMS1[1]})
     elif [[ ${WPDIMS1[0]} -eq ${WPDIMS2[2]} ]]; then
+        # Side-by-side, display 1 is to the left of display 2.
         WPSTACKED=false
         # Calculate the blank areas above/below the monitors.
         WPYYOFS=$((${WPDIMS1[1]} + ${WPDIMS1[3]}))
@@ -134,19 +136,12 @@ if $WPDUAL; then
         WPYOVER=$((${WPSCREEN[1]} - $WPYYOFS))
         WPB3=(${WPDIMS2[0]} ${WPDIMS2[3]})
         WPB4=(${WPDIMS2[0]} $WPYOVER)
-    elif [[ ${WPDIMS1[0]} -eq ${WPDIMS2[2]} ]]; then
-        WPSTACKED=false
-        # Calculate the blank areas above/below the monitors.
-        WPYYOFS=$((${WPDIMS2[1]} + ${WPDIMS2[3]}))
-        WPYOVER=$((${WPSCREEN[1]} - $WPYYOFS))
-        WPB1=(${WPDIMS2[0]} ${WPDIMS2[3]})
-        WPB2=(${WPDIMS2[0]} $WPYOVER)
-        WPYYOFS=$((${WPDIMS1[1]} + ${WPDIMS1[3]}))
-        WPYOVER=$((${WPSCREEN[1]} - $WPYYOFS))
-        WPB3=(${WPDIMS1[0]} ${WPDIMS1[3]})
-        WPB4=(${WPDIMS1[0]} $WPYOVER)
+    else
+        echo "Something is wrong -- cannot continue."
+        echo ${WPDIMS1[@]} -- ${WPDIMS2[@]}
+        exit
     fi
-    echo "Stacked: $WPSTACKED - ${WPB1[@]} ${WPB2[@]} ${WPB3[@]} ${WPB4[@]}"
+    debugmsg "Stacked: $WPSTACKED - ${WPB1[@]} ${WPB2[@]} ${WPB3[@]} ${WPB4[@]}"
 fi
 
 if $WPDUAL; then
@@ -260,38 +255,44 @@ while true; do
         mv "$WPHOME"/"$WPNEXT1".HOLD "$WPDEST"/"$WPNEXT1"
         mv "$WPHOME"/"$WPNEXT2" "$WPDEST"
 
-        # Create the merged background image.
+        # Determine the name of the new merged image file.
         WPFILE="$WPDEST"/"${WPCVTF}${WPCVTS}.png"
         ((WPCVTS+=1))
 
+        # Resize and crop each image to fit its monitor.
         cd "$WPDEST"
-        CVTFLAGS="-resize ${WPMONX}x${WPMONY}^ -gravity center -crop ${WPMONX}x${WPMONY}+0+0"
+        CVTFLAGS="-resize ${WPDIMS1[0]}x${WPDIMS1[1]}^ -gravity center -crop ${WPDIMS1[0]}x${WPDIMS1[1]}+0+0"
         convert "$WPNEXT1" $CVTFLAGS wall1.png
+        CVTFLAGS="-resize ${WPDIMS2[0]}x${WPDIMS2[1]}^ -gravity center -crop ${WPDIMS2[0]}x${WPDIMS2[1]}+0+0"
         convert "$WPNEXT2" $CVTFLAGS wall2.png
 
         if $WPSTACKED; then
+            # Blank regions are left/right, images are above/below.
             WPAPPBLN=+append
             WPAPPEND=-append
         else
+            # Blank regions are above/below, images are left/right.
             WPAPPBLN=-append
             WPAPPEND=+append
         fi
 
+        # Append any non-zero blank regions to the wallpaper image.
+
         if [[ ${WPB1[0]} -ne 0 && ${WPB1[1]} -ne 0 ]]; then
-            convert -size ${WPB1[0]}x${WPB1[1]} xc:red __blank.png
+            convert -size ${WPB1[0]}x${WPB1[1]} xc:black __blank.png
             convert __blank.png wall1.png $WPAPPBLN wall1.png
         fi
         if [[ ${WPB2[0]} -ne 0 && ${WPB2[1]} -ne 0 ]]; then
-            convert -size ${WPB2[0]}x${WPB2[1]} xc:red __blank.png
+            convert -size ${WPB2[0]}x${WPB2[1]} xc:black __blank.png
             convert wall1.png __blank.png $WPAPPBLN wall1.png
         fi
 
         if [[ ${WPB3[0]} -ne 0 && ${WPB3[1]} -ne 0 ]]; then
-            convert -size ${WPB3[0]}x${WPB3[1]} xc:red __blank.png
+            convert -size ${WPB3[0]}x${WPB3[1]} xc:black __blank.png
             convert __blank.png wall2.png $WPAPPBLN wall2.png
         fi
         if [[ ${WPB4[0]} -ne 0 && ${WPB4[1]} -ne 0 ]]; then
-            convert -size ${WPB4[0]}x${WPB4[1]} xc:red __blank.png
+            convert -size ${WPB4[0]}x${WPB4[1]} xc:black __blank.png
             convert wall2.png __blank.png $WPAPPBLN wall2.png
         fi
 
@@ -301,7 +302,14 @@ while true; do
         echo "$WPDATE  New wallpaper file://$WPFILE (from $WPNEXT1 + $WPNEXT2)" >> "$WPHIST"
     else
         mv "$WPHOME"/"$WPNEXT" "$WPDEST"
-        WPFILE="$WPDEST"/"$WPNEXT"
+
+        # Determine the name of the new merged image file.
+        WPFILE="$WPDEST"/"${WPCVTF}${WPNEXT}.png"
+
+        # Resize and crop to fit the monitor.
+        cd "$WPDEST"
+        CVTFLAGS="-resize ${WPDIMS1[0]}x${WPDIMS1[1]}^ -gravity center -crop ${WPDIMS1[0]}x${WPDIMS1[1]}+0+0"
+        convert "$WPNEXT" $CVTFLAGS "$WPFILE"
         echo "$WPDATE  New wallpaper file://$WPFILE" >> "$WPHIST"
     fi
 
