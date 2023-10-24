@@ -303,13 +303,18 @@ while true; do
     else
         mv "$WPHOME"/"$WPNEXT" "$WPDEST"
 
-        # Determine the name of the new merged image file.
-        WPFILE="$WPDEST"/"${WPCVTF}${WPNEXT}.png"
+        hash convert >& /dev/null
+        if [[ $? -ne 0 ]]; then
+            WPFILE="$WPDEST"/"$WPNEXT"
+        else
+            # Determine the name of the new merged image file.
+            WPFILE="$WPDEST"/"${WPCVTF}${WPNEXT}.png"
 
-        # Resize and crop to fit the monitor.
-        cd "$WPDEST"
-        CVTFLAGS="-resize ${WPDIMS1[0]}x${WPDIMS1[1]}^ -gravity center -crop ${WPDIMS1[0]}x${WPDIMS1[1]}+0+0"
-        convert "$WPNEXT" $CVTFLAGS "$WPFILE"
+            # Resize and crop to fit the monitor.
+            cd "$WPDEST"
+            CVTFLAGS="-resize ${WPDIMS1[0]}x${WPDIMS1[1]}^ -gravity center -crop ${WPDIMS1[0]}x${WPDIMS1[1]}+0+0"
+            convert "$WPNEXT" $CVTFLAGS "$WPFILE"
+        fi
         echo "$WPDATE  New wallpaper file://$WPFILE" >> "$WPHIST"
     fi
 
