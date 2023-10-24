@@ -14,7 +14,7 @@ WPTIME=$((10 * 60))
 
 # The first wallpaper image is displayed after this many seconds.
 # NOTE: Subsequent images are updated every WPTIME seconds.
-WPWAIT=0
+WPWAIT=30
 
 # Verify the parameter is an integer, else use the default (above).
 if [ "$1" -eq "$1" ] 2> /dev/null; then
@@ -66,19 +66,9 @@ WPLPID="$WPLOCK"/lock-$$
 
 echo "$WPDATE  Starting wallpaper updater for user $USER." >> "$WPHIST"
 
+# Query the system to get the screen and display configuration.
 WPXRANDR="$WPHOME"/.screen
 xrandr --query > "$WPXRANDR"
-WPMONCNT=$(grep ' connected' "$WPXRANDR" | wc -l)
-if [[ $WPMONCNT -eq 1 ]]; then
-    WPDUAL=false
-    echo "There is one monitor connected to this system."
-elif [[ $WPMONCNT -eq 2 ]]; then
-    WPDUAL=true
-    echo "There are two monitors connected to this system."
-else
-    echo "There are $WPMONCNT monitors, cannot run wallpaper updater."
-    exit
-fi
 
 WPSCREEN=($(awk '/Screen/ && sub(/.*current /, "") \
                           && sub(/x /,"") && sub(/,.*/,"")' "$WPXRANDR"))
@@ -89,13 +79,75 @@ WPDIMS1=($(awk -v dsp=1 'sub(/.* connected/,"") && sub(/x/," ") && sub(/+/," ") 
                          else print $1 " " $2 " " $3 " " $4; exit}' "$WPXRANDR"))
 echo "Monitor1 is ${WPDIMS1[0]} x ${WPDIMS1[1]} + ${WPDIMS1[2]} + ${WPDIMS1[3]}"
 
+WPMONCNT=$(grep ' connected' "$WPXRANDR" | wc -l)
+if [[ $WPMONCNT -eq 1 ]]; then
+    WPDUAL=false
+    echo "There is only one monitor connected to this system."
+elif [[ $WPMONCNT -eq 2 ]]; then
+    WPDUAL=true
+    echo "There are two monitors connected to this system."
+else
+    WPDUAL=false
+    echo "There are $WPMONCNT monitors. Currently, only 1 or 2 monitors"
+    echo "are supported, treating as a single monitor."
+    WPDIMS1[0]=${WPSCREEN[0]}
+    WPDIMS1[1]=${WPSCREEN[1]}
+fi
+
 if $WPDUAL; then
     WPDIMS2=($(awk -v dsp=2 'sub(/.* connected/,"") && sub(/x/," ") && sub(/+/," ") && sub(/+/," "){cnt++} \
                              (cnt==dsp){if ($1 == "primary") print $2 " " $3 " " $4 " " $5; \
                              else print $1 " " $2 " " $3 " " $4; exit}' "$WPXRANDR"))
     echo "Monitor2 is ${WPDIMS2[0]} x ${WPDIMS2[1]} + ${WPDIMS2[2]} + ${WPDIMS2[3]}"
+
+    # Check if the displays are stacked vertically or not.
+    if [[ ${WPDIMS1[1]} -eq ${WPDIMS2[3]} ]]; then
+        WPSTACKED=true
+        # Calculate the blank areas left/right of the monitors.
+        WPXXOFS=$((${WPDIMS1[0]} + ${WPDIMS1[2]}))
+        WPXOVER=$((${WPSCREEN[0]} - $WPXXOFS))
+        WPB1=(${WPDIMS1[2]} ${WPDIMS1[1]})
+        WPB2=($WPXOVER ${WPDIMS1[1]})
+        WPXXOFS=$((${WPDIMS2[0]} + ${WPDIMS2[2]}))
+        WPXOVER=$((${WPSCREEN[0]} - $WPXXOFS))
+        WPB3=(${WPDIMS2[2]} ${WPDIMS2[1]})
+        WPB4=($WPXOVER ${WPDIMS2[1]})
+    elif [[ ${WPDIMS2[1]} -eq ${WPDIMS1[3]} ]]; then
+        WPSTACKED=true
+        # Calculate the blank areas left/right of the monitors.
+        WPXXOFS=$((${WPDIMS2[0]} + ${WPDIMS2[2]}))
+        WPXOVER=$((${WPSCREEN[0]} - $WPXXOFS))
+        WPB1=(${WPDIMS2[2]} ${WPDIMS2[1]})
+        WPB2=($WPXOVER ${WPDIMS2[1]})
+        WPXXOFS=$((${WPDIMS1[0]} + ${WPDIMS1[2]}))
+        WPXOVER=$((${WPSCREEN[0]} - $WPXXOFS))
+        WPB3=(${WPDIMS1[2]} ${WPDIMS1[1]})
+        WPB4=($WPXOVER ${WPDIMS1[1]})
+    elif [[ ${WPDIMS1[0]} -eq ${WPDIMS2[2]} ]]; then
+        WPSTACKED=false
+        # Calculate the blank areas above/below the monitors.
+        WPYYOFS=$((${WPDIMS1[1]} + ${WPDIMS1[3]}))
+        WPYOVER=$((${WPSCREEN[1]} - $WPYYOFS))
+        WPB1=(${WPDIMS1[0]} ${WPDIMS1[3]})
+        WPB2=(${WPDIMS1[0]} $WPYOVER)
+        WPYYOFS=$((${WPDIMS2[1]} + ${WPDIMS2[3]}))
+        WPYOVER=$((${WPSCREEN[1]} - $WPYYOFS))
+        WPB3=(${WPDIMS2[0]} ${WPDIMS2[3]})
+        WPB4=(${WPDIMS2[0]} $WPYOVER)
+    elif [[ ${WPDIMS1[0]} -eq ${WPDIMS2[2]} ]]; then
+        WPSTACKED=false
+        # Calculate the blank areas above/below the monitors.
+        WPYYOFS=$((${WPDIMS2[1]} + ${WPDIMS2[3]}))
+        WPYOVER=$((${WPSCREEN[1]} - $WPYYOFS))
+        WPB1=(${WPDIMS2[0]} ${WPDIMS2[3]})
+        WPB2=(${WPDIMS2[0]} $WPYOVER)
+        WPYYOFS=$((${WPDIMS1[1]} + ${WPDIMS1[3]}))
+        WPYOVER=$((${WPSCREEN[1]} - $WPYYOFS))
+        WPB3=(${WPDIMS1[0]} ${WPDIMS1[3]})
+        WPB4=(${WPDIMS1[0]} $WPYOVER)
+    fi
+    echo "Stacked: $WPSTACKED - ${WPB1[@]} ${WPB2[@]} ${WPB3[@]} ${WPB4[@]}"
 fi
-exit
 
 if $WPDUAL; then
     # Check if we can merge two images for the background.
@@ -213,15 +265,38 @@ while true; do
         ((WPCVTS+=1))
 
         cd "$WPDEST"
-        CVTOVRH=cvt-ovr.png
         CVTFLAGS="-resize ${WPMONX}x${WPMONY}^ -gravity center -crop ${WPMONX}x${WPMONY}+0+0"
-        cp ../.overhang-blk $CVTOVRH
         convert "$WPNEXT1" $CVTFLAGS wall1.png
         convert "$WPNEXT2" $CVTFLAGS wall2.png
-        convert "$CVTOVRH" wall1.png -append junk1.png
-        convert wall2.png "$CVTOVRH" -append junk2.png
-        convert junk1.png junk2.png +append "$WPFILE"
-        rm $CVTOVRH wall1.png wall2.png junk1.png junk2.png
+
+        if $WPSTACKED; then
+            WPAPPBLN=+append
+            WPAPPEND=-append
+        else
+            WPAPPBLN=-append
+            WPAPPEND=+append
+        fi
+
+        if [[ ${WPB1[0]} -ne 0 && ${WPB1[1]} -ne 0 ]]; then
+            convert -size ${WPB1[0]}x${WPB1[1]} xc:red __blank.png
+            convert __blank.png wall1.png $WPAPPBLN wall1.png
+        fi
+        if [[ ${WPB2[0]} -ne 0 && ${WPB2[1]} -ne 0 ]]; then
+            convert -size ${WPB2[0]}x${WPB2[1]} xc:red __blank.png
+            convert wall1.png __blank.png $WPAPPBLN wall1.png
+        fi
+
+        if [[ ${WPB3[0]} -ne 0 && ${WPB3[1]} -ne 0 ]]; then
+            convert -size ${WPB3[0]}x${WPB3[1]} xc:red __blank.png
+            convert __blank.png wall2.png $WPAPPBLN wall2.png
+        fi
+        if [[ ${WPB4[0]} -ne 0 && ${WPB4[1]} -ne 0 ]]; then
+            convert -size ${WPB4[0]}x${WPB4[1]} xc:red __blank.png
+            convert wall2.png __blank.png $WPAPPBLN wall2.png
+        fi
+
+        convert wall1.png wall2.png $WPAPPEND "$WPFILE"
+        rm -f __blank.png wall1.png wall2.png
 
         echo "$WPDATE  New wallpaper file://$WPFILE (from $WPNEXT1 + $WPNEXT2)" >> "$WPHIST"
     else
