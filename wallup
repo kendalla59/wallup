@@ -18,7 +18,10 @@ WPWAIT=30
 
 # Responsiveness to logout or multiple instances is determined
 # by the WPRESP variable, the time to respond in seconds.
-WPRESP=3
+WPRESP=10
+
+# Set "=true" for dynamic response to display changes.
+WPDYNAM=false
 
 # Verify the parameter is an integer, else use the default (above).
 if [ "$1" -eq "$1" ] 2> /dev/null; then
@@ -146,7 +149,7 @@ function setdims {
     #
     # Get the display size and offset for the first monitor.
     #
-    WPDIMS1=($(awk -v dsp=1 'sub(/.* connected/,"") && sub(/\x/," ") && sub(/\+/," ") && sub(/\+/," "){cnt++} \
+    WPDIMS1=($(awk -v dsp=1 'sub(/.* connected/,"") && sub(/x/," ") && sub(/\+/," ") && sub(/\+/," "){cnt++} \
                          (cnt==dsp){if ($1 == "primary") print $2 " " $3 " " $4 " " $5; \
                          else print $1 " " $2 " " $3 " " $4; exit}' "$WPXRANDR"))
     echo "$WPDATE  Monitor1 is ${WPDIMS1[0]} x ${WPDIMS1[1]} + ${WPDIMS1[2]} + ${WPDIMS1[3]}" >> "$WPHIST"
@@ -182,7 +185,7 @@ function setdims {
         #
         # Get the display size and offset for the second monitor.
         #
-        WPDIMS2=($(awk -v dsp=2 'sub(/.* connected/,"") && sub(/\x/," ") && sub(/\+/," ") && sub(/\+/," "){cnt++} \
+        WPDIMS2=($(awk -v dsp=2 'sub(/.* connected/,"") && sub(/x/," ") && sub(/\+/," ") && sub(/\+/," "){cnt++} \
                              (cnt==dsp){if ($1 == "primary") print $2 " " $3 " " $4 " " $5; \
                              else print $1 " " $2 " " $3 " " $4; exit}' "$WPXRANDR"))
         echo "$WPDATE  Monitor2 is ${WPDIMS2[0]} x ${WPDIMS2[1]} + ${WPDIMS2[2]} + ${WPDIMS2[3]}" >> "$WPHIST"
@@ -263,7 +266,9 @@ while true; do
             exit
         fi
 
-        checkdims
+        if $WPDYNAM; then
+            checkdims
+        fi
 
     done
     WPWAIT=$WPTIME
