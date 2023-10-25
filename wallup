@@ -18,10 +18,10 @@ WPWAIT=30
 
 # Responsiveness to logout or multiple instances is determined
 # by the WPRESP variable, the time to respond in seconds.
-WPRESP=10
+WPRESP=2
 
 # Set "=true" for dynamic response to display changes.
-WPDYNAM=false
+WPDYNAM=true
 
 # Verify the parameter is an integer, else use the default (above).
 if [ "$1" -eq "$1" ] 2> /dev/null; then
@@ -70,6 +70,7 @@ getdate
 WPHIST="$WPDEST"/wallup.log
 WPLOCK="$WPDEST"/.mult-lock
 WPLPID="$WPLOCK"/lock-$$
+WPFIFO="$WPLOCK"/wpipe
 
 # Files used to store the screen and display configuration.
 WPXRANDR="$WPHOME"/.screen
@@ -91,6 +92,19 @@ fi
 
 # Create a new lock file for this process ID
 touch "$WPLPID"
+
+# Sleep without using "sleep", which forks a new process.
+function minisleep {
+    if [[ ! -p "$WPFIFO" ]]; then
+        rm -f "$WPFIFO"
+        mkfifo $WPFIFO
+	if [[ $? -ne 0 ]]; then
+            sleep $1
+	    return
+        fi
+    fi
+    read -t $1 <>"$WPFIFO"
+}
 
 # Randomly select the next wallpaper image to be displayed.
 function getrandom {
@@ -253,7 +267,7 @@ while true; do
             exit
         fi
 
-        sleep $WPRESP
+        minisleep $WPRESP
         WPWAIT=$((WPWAIT - WPRESP))
 
         if [[ $(ps -C gnome-shell -o euser= | grep $USER) == "" ]]; then
