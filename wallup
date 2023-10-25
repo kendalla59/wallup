@@ -41,6 +41,11 @@ if [[ -z "$WPHOME" ]]; then
     fi
 fi
 
+# This file contains the wallpaper currently being displayed.
+# NOTE: The "." (dot) prefix is required to prevent it being
+#       selected as a source for the next wallpaper image.
+WPFILE="$WPHOME"/.background.png
+
 WPDEST="$WPHOME"/"$WPSAVE"
 if [[ ! -d "$WPDEST" ]]; then
     mkdir "$WPDEST"
@@ -49,17 +54,6 @@ if [[ ! -d "$WPDEST" ]]; then
         exit
     fi
 fi
-
-# This integer is incremented each time "convert" joins two images.
-WPCVTS=1
-WPCVTF=cvt-
-
-# Scan for any existing converted files (from a previous run).
-WPFILE="$WPDEST"/"${WPCVTF}${WPCVTS}.png"
-while [[ -f "$WPFILE" ]]; do
-    ((WPCVTS+=1))
-    WPFILE="$WPDEST"/"${WPCVTF}${WPCVTS}.png"
-done
 
 # Pass in a parameter of 0 (initial wait time) to get debug messages.
 function debugmsg {
@@ -72,9 +66,6 @@ function getdate {
     printf -v WPDATE '%-5d %s %s' $$ $(date +"%D %I:%M%p")
 }
 getdate
-
-# Make sure we are using the "spanned" background option.
-gsettings set org.gnome.desktop.background picture-options 'spanned'
 
 WPHIST="$WPDEST"/wallup.log
 WPLOCK="$WPDEST"/.mult-lock
@@ -110,10 +101,6 @@ function getrandom {
 # Restore all of the previously displayed images back to the home folder.
 function restore {
     cd "$WPDEST"
-
-    # Clear out the temporary conglomerate image files.
-    WPCVTS=1
-    rm "$WPCVTF"*.png
 
     # Count the total number of images being moved (for diagnostic purposes).
     WPFCNT=$(ls -1 ${WPEXTS[@]/#/"*."} 2> /dev/null | wc -l)
@@ -243,6 +230,16 @@ function checkdims {
     fi
 }
 
+# Seed the first wallpaper image if necessary.
+if [[ ! -f "$WPFILE" ]]; then
+    getrandom
+    cp "$WPNEXT" "$WPFILE"
+fi
+ 
+# Make sure we are using the "spanned" background option.
+gsettings set org.gnome.desktop.background picture-options 'spanned'
+gsettings set org.gnome.desktop.background picture-uri file://"$WPFILE"
+
 # Find the dimensions of the desktop background.
 xrandr --query > "$WPXRANDR"
 setdims
@@ -291,16 +288,12 @@ while true; do
         mv "$WPHOME"/"$WPNEXT1".HOLD "$WPDEST"/"$WPNEXT1"
         mv "$WPHOME"/"$WPNEXT2" "$WPDEST"
 
-        # Determine the name of the new merged image file.
-        WPFILE="$WPDEST"/"${WPCVTF}${WPCVTS}.png"
-        ((WPCVTS+=1))
-
         # Resize and crop each image to fit its monitor.
         cd "$WPDEST"
         CVTFLAGS="-resize ${WPDIMS1[0]}x${WPDIMS1[1]}^ -gravity center -crop ${WPDIMS1[0]}x${WPDIMS1[1]}+0+0"
-        convert "$WPNEXT1" $CVTFLAGS wall1.png
+        convert "$WPNEXT1" $CVTFLAGS .wall1.png
         CVTFLAGS="-resize ${WPDIMS2[0]}x${WPDIMS2[1]}^ -gravity center -crop ${WPDIMS2[0]}x${WPDIMS2[1]}+0+0"
-        convert "$WPNEXT2" $CVTFLAGS wall2.png
+        convert "$WPNEXT2" $CVTFLAGS .wall2.png
 
         if $WPSTACKED; then
             # Blank regions are left/right, images are above/below.
@@ -315,45 +308,48 @@ while true; do
         # Append any non-zero blank regions to the wallpaper image.
 
         if [[ ${WPB1[0]} -ne 0 && ${WPB1[1]} -ne 0 ]]; then
-            convert -size ${WPB1[0]}x${WPB1[1]} xc:black __blank.png
-            convert __blank.png wall1.png $WPAPPBLN wall1.png
+            convert -size ${WPB1[0]}x${WPB1[1]} xc:black .wblank1.png
+            convert .wblank1.png .wall1.png $WPAPPBLN .wall1.png
         fi
         if [[ ${WPB2[0]} -ne 0 && ${WPB2[1]} -ne 0 ]]; then
-            convert -size ${WPB2[0]}x${WPB2[1]} xc:black __blank.png
-            convert wall1.png __blank.png $WPAPPBLN wall1.png
+            convert -size ${WPB2[0]}x${WPB2[1]} xc:black .wblank2.png
+            convert .wall1.png .wblank2.png $WPAPPBLN .wall1.png
         fi
 
         if [[ ${WPB3[0]} -ne 0 && ${WPB3[1]} -ne 0 ]]; then
-            convert -size ${WPB3[0]}x${WPB3[1]} xc:black __blank.png
-            convert __blank.png wall2.png $WPAPPBLN wall2.png
+            convert -size ${WPB3[0]}x${WPB3[1]} xc:black .wblank3.png
+            convert .wblank3.png .wall2.png $WPAPPBLN .wall2.png
         fi
         if [[ ${WPB4[0]} -ne 0 && ${WPB4[1]} -ne 0 ]]; then
-            convert -size ${WPB4[0]}x${WPB4[1]} xc:black __blank.png
-            convert wall2.png __blank.png $WPAPPBLN wall2.png
+            convert -size ${WPB4[0]}x${WPB4[1]} xc:black .wblank4.png
+            convert .wall2.png .wblank4.png $WPAPPBLN .wall2.png
         fi
 
-        convert wall1.png wall2.png $WPAPPEND "$WPFILE"
-        rm -f __blank.png wall1.png wall2.png
+        convert .wall1.png .wall2.png $WPAPPEND .wallpaper.png
 
-        echo "$WPDATE  New wallpaper file://$WPFILE (from $WPNEXT1 + $WPNEXT2)" >> "$WPHIST"
+        # Here is where the wallpaper appears on the screen.
+        cp .wallpaper.png "$WPFILE"
+
+        echo "$WPDATE  New wallpaper image derived from $WPNEXT1 and $WPNEXT2" >> "$WPHIST"
     else
         mv "$WPHOME"/"$WPNEXT" "$WPDEST"
 
+        cd "$WPDEST"
+
         hash convert >& /dev/null
         if [[ $? -ne 0 ]]; then
-            WPFILE="$WPDEST"/"$WPNEXT"
+            # We cannot resize or crop the image, use it as-is.
+            cp "$WPNEXT" .wallpaper.png
         else
-            # Determine the name of the new merged image file.
-            WPFILE="$WPDEST"/"${WPCVTF}${WPNEXT}.png"
-
             # Resize and crop to fit the monitor.
-            cd "$WPDEST"
             CVTFLAGS="-resize ${WPDIMS1[0]}x${WPDIMS1[1]}^ -gravity center -crop ${WPDIMS1[0]}x${WPDIMS1[1]}+0+0"
-            convert "$WPNEXT" $CVTFLAGS "$WPFILE"
+            convert "$WPNEXT" $CVTFLAGS .wallpaper.png
         fi
-        echo "$WPDATE  New wallpaper file://$WPFILE" >> "$WPHIST"
-    fi
 
-    gsettings set org.gnome.desktop.background picture-uri file://"$WPFILE"
+        # Here is where the wallpaper appears on the screen.
+        cp .wallpaper.png "$WPFILE"
+
+        echo "$WPDATE  New wallpaper image derived from $WPNEXT" >> "$WPHIST"
+    fi
 
 done
