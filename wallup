@@ -99,9 +99,9 @@ function minisleep {
     if [[ ! -p "$WPFIFO" ]]; then
         rm -f "$WPFIFO"
         mkfifo $WPFIFO
-	if [[ $? -ne 0 ]]; then
+        if [[ $? -ne 0 ]]; then
             sleep $1
-	    return
+            return
         fi
     fi
     read -t $1 <>"$WPFIFO"
@@ -153,14 +153,17 @@ function setdims {
     debugmsg "Screen is ${WPSCREEN[0]} pixels wide and ${WPSCREEN[1]} pixels tall."
 
     #
+    # Count the number of connected monitors.
+    #
+    WPMONCNT=$(awk 'sub(/.* connected/,"") && sub(/x/," ") && sub(/\+/," ") && sub(/\+/," ")' "$WPXRANDR" | wc -l)
+
+    #
     # Get the display size and offset for the first monitor.
     #
     WPDIMS1=($(awk -v dsp=1 'sub(/.* connected/,"") && sub(/x/," ") && sub(/\+/," ") && sub(/\+/," "){cnt++} \
                          (cnt==dsp){if ($1 == "primary") print $2 " " $3 " " $4 " " $5; \
                          else print $1 " " $2 " " $3 " " $4; exit}' "$WPXRANDR"))
     echo "$WPDATE  Monitor1 is ${WPDIMS1[0]} x ${WPDIMS1[1]} + ${WPDIMS1[2]} + ${WPDIMS1[3]}" >> "$WPHIST"
-
-    WPMONCNT=$(grep ' connected' "$WPXRANDR" | wc -l)
 
     # Verify we can do the proper image conversions for dual displays.
     hash convert >& /dev/null
