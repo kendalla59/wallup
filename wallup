@@ -74,7 +74,8 @@ WPFIFO="$WPLOCK"/wpipe
 
 # Files used to store the screen and display configuration.
 WPXRANDR="$WPHOME"/.screen
-WPXRTEST="$WPHOME"/.scrtst
+WPMONXML="$WPHOME"/.scrxml
+WPMONCFG="$HOME"/.config/monitors.xml
 
 echo "$WPDATE  Starting wallpaper updater for user $USER." >> "$WPHIST"
 
@@ -140,6 +141,10 @@ function getnext {
 
 # Extract the display dimensions from the output of "xrandr --query".
 function setdims {
+    # Query and save the display configuration.
+    xrandr --query > "$WPXRANDR"
+    cp "$WPMONCFG" "$WPMONXML"
+
     #
     # Get the total screen dimensions.
     #
@@ -235,10 +240,8 @@ function setdims {
 }
 
 function checkdims {
-    xrandr --query > "$WPXRTEST"
-    diff "$WPXRTEST" "$WPXRANDR" > /dev/null
+    cmp "$WPMONCFG" "$WPMONXML" > /dev/null
     if [[ $? -ne 0 ]]; then
-        mv "$WPXRTEST" "$WPXRANDR"
         setdims
         WPWAIT=0
     fi
@@ -255,7 +258,6 @@ gsettings set org.gnome.desktop.background picture-options 'spanned'
 gsettings set org.gnome.desktop.background picture-uri file://"$WPFILE"
 
 # Find the dimensions of the desktop background.
-xrandr --query > "$WPXRANDR"
 setdims
 
 while true; do
