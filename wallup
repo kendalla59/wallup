@@ -247,6 +247,9 @@ function checkdims {
     if [[ $? -ne 0 ]]; then
         setdims
         WPWAIT=0
+
+        # Force new image conversions for each monitor.
+        rm -f "$WPDEST"/.wall[12].png
     fi
 }
 
@@ -289,31 +292,20 @@ while true; do
     done
     WPWAIT=$WPTIME
 
+    getdate
+
     # If the destination directory disappeared while we were waiting, exit now.
     if [[ ! -d "$WPDEST" ]]; then
-        echo "No directory $WPDEST. Exiting..."
+        echo "$WPDATE  No directory $WPDEST. Exiting..."
         exit
     fi
 
-    getdate
-
+    # Get a random image and move it into the save folder.
     getnext
+    mv "$WPHOME"/"$WPNEXT" "$WPDEST"
+    cd "$WPDEST"
 
     if $WPDUAL; then
-        WPNEXT1=$WPNEXT
-        mv "$WPHOME"/"$WPNEXT1" "$WPHOME"/"$WPNEXT1".HOLD
-        getnext
-        WPNEXT2=$WPNEXT
-        mv "$WPHOME"/"$WPNEXT1".HOLD "$WPDEST"/"$WPNEXT1"
-        mv "$WPHOME"/"$WPNEXT2" "$WPDEST"
-
-        # Resize and crop each image to fit its monitor.
-        cd "$WPDEST"
-        CVTFLAGS="-resize ${WPDIMS1[0]}x${WPDIMS1[1]}^ -gravity center -crop ${WPDIMS1[0]}x${WPDIMS1[1]}+0+0"
-        convert "$WPNEXT1" $CVTFLAGS .wall1.png
-        CVTFLAGS="-resize ${WPDIMS2[0]}x${WPDIMS2[1]}^ -gravity center -crop ${WPDIMS2[0]}x${WPDIMS2[1]}+0+0"
-        convert "$WPNEXT2" $CVTFLAGS .wall2.png
-
         if $WPSTACKED; then
             # Blank regions are left/right, images are above/below.
             WPAPPBLN=+append
@@ -324,24 +316,51 @@ while true; do
             WPAPPEND=+append
         fi
 
-        # Append any non-zero blank regions to the wallpaper image.
+        # -- NOTE --
+        # We want to replace the older of the two wallpaper images.
+        # However it's possible that the cached image doesn't exist
+        # yet or was deleted. So instead we check to see if the
+        # currently displayed image is NOT the newest. This test
+        # succeeds for the older, or for non-existing files. Also,
+        # if neither cached image exists then both will be created.
 
-        if [[ ${WPB1[0]} -ne 0 && ${WPB1[1]} -ne 0 ]]; then
-            convert -size ${WPB1[0]}x${WPB1[1]} xc:black .wblank1.png
-            convert .wblank1.png .wall1.png $WPAPPBLN .wall1.png
-        fi
-        if [[ ${WPB2[0]} -ne 0 && ${WPB2[1]} -ne 0 ]]; then
-            convert -size ${WPB2[0]}x${WPB2[1]} xc:black .wblank2.png
-            convert .wall1.png .wblank2.png $WPAPPBLN .wall1.png
-        fi
+        # Get the current wallpaper image files in time order.
+        WPIMGS=($(ls -t .wall[12].png 2> /dev/null))
 
-        if [[ ${WPB3[0]} -ne 0 && ${WPB3[1]} -ne 0 ]]; then
-            convert -size ${WPB3[0]}x${WPB3[1]} xc:black .wblank3.png
-            convert .wblank3.png .wall2.png $WPAPPBLN .wall2.png
+        # If the first image is not the newest image, replace it.
+        if [[ "${WPIMGS[0]}" != ".wall1.png" ]]; then
+            WPNEXT1="$WPNEXT"
+            CVTDIMS=${WPDIMS1[0]}x${WPDIMS1[1]}
+            CVTFLAGS="-resize ${CVTDIMS}^ -gravity center -crop ${CVTDIMS}+0+0"
+            convert "$WPNEXT" $CVTFLAGS .wall1.png
+
+            # Append any non-zero blank regions to the wallpaper image.
+            if [[ ${WPB1[0]} -ne 0 && ${WPB1[1]} -ne 0 ]]; then
+                convert -size ${WPB1[0]}x${WPB1[1]} xc:black .wblank1.png
+                convert .wblank1.png .wall1.png $WPAPPBLN .wall1.png
+            fi
+            if [[ ${WPB2[0]} -ne 0 && ${WPB2[1]} -ne 0 ]]; then
+                convert -size ${WPB2[0]}x${WPB2[1]} xc:black .wblank2.png
+                convert .wall1.png .wblank2.png $WPAPPBLN .wall1.png
+            fi
         fi
-        if [[ ${WPB4[0]} -ne 0 && ${WPB4[1]} -ne 0 ]]; then
-            convert -size ${WPB4[0]}x${WPB4[1]} xc:black .wblank4.png
-            convert .wall2.png .wblank4.png $WPAPPBLN .wall2.png
+        
+        # If the second image is not the newest image, replace it.
+        if [[ "${WPIMGS[0]}" != ".wall2.png" ]]; then
+            WPNEXT2="$WPNEXT"
+            CVTDIMS=${WPDIMS2[0]}x${WPDIMS2[1]}
+            CVTFLAGS="-resize ${CVTDIMS}^ -gravity center -crop ${CVTDIMS}+0+0"
+            convert "$WPNEXT" $CVTFLAGS .wall2.png
+
+            # Append any non-zero blank regions to the wallpaper image.
+            if [[ ${WPB3[0]} -ne 0 && ${WPB3[1]} -ne 0 ]]; then
+                convert -size ${WPB3[0]}x${WPB3[1]} xc:black .wblank3.png
+                convert .wblank3.png .wall2.png $WPAPPBLN .wall2.png
+            fi
+            if [[ ${WPB4[0]} -ne 0 && ${WPB4[1]} -ne 0 ]]; then
+                convert -size ${WPB4[0]}x${WPB4[1]} xc:black .wblank4.png
+                convert .wall2.png .wblank4.png $WPAPPBLN .wall2.png
+            fi
         fi
 
         convert .wall1.png .wall2.png $WPAPPEND .wallpaper.png
@@ -351,10 +370,6 @@ while true; do
 
         echo "$WPDATE  New wallpaper image derived from $WPNEXT1 and $WPNEXT2" >> "$WPHIST"
     else
-        mv "$WPHOME"/"$WPNEXT" "$WPDEST"
-
-        cd "$WPDEST"
-
         hash convert >& /dev/null
         if [[ $? -ne 0 ]]; then
             # We cannot resize or crop the image, use it as-is.
