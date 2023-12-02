@@ -258,7 +258,11 @@ if [[ ! -f "$WPFILE" ]]; then
     getrandom
     cp "$WPNEXT" "$WPFILE"
 fi
- 
+
+# On startup we don't know the origin of any cached images.
+WPNEXT1="(Cached Image 1)"
+WPNEXT2="(Cached Image 2)"
+
 # Make sure we are using the "spanned" background option.
 gsettings set org.gnome.desktop.background picture-options 'spanned'
 gsettings set org.gnome.desktop.background picture-uri file://"$WPFILE"
