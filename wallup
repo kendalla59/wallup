@@ -26,6 +26,9 @@ WPDYNAM=true
 # Verify the parameter is an integer, else use the default (above).
 if [ "$1" -eq "$1" ] 2> /dev/null; then
     WPWAIT=$1
+elif [[ "$1" == "debug" ]]; then
+    WPWAIT=0
+    WPTIME=10
 fi
 
 # This is the name of the subdirectory to place the images
@@ -143,7 +146,12 @@ function getnext {
 function setdims {
     # Query and save the display configuration.
     xrandr --query > "$WPXRANDR"
-    cp "$WPMONCFG" "$WPMONXML"
+    if [[ -f "$WPMONCFG" ]]; then
+        cp "$WPMONCFG" "$WPMONXML"
+    else
+        debugmsg "NOTE: \"$WPMONCFG\" not found, auto resize is disabled."
+        WPDYNAM=false
+    fi
 
     #
     # Get the total screen dimensions.
