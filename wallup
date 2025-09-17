@@ -274,6 +274,7 @@ WPNEXT2="(Cached Image 2)"
 # Make sure we are using the "spanned" background option.
 gsettings set org.gnome.desktop.background picture-options 'spanned'
 gsettings set org.gnome.desktop.background picture-uri file://"$WPFILE"
+gsettings set org.gnome.desktop.background picture-uri-dark file://"$WPFILE"
 
 # Find the dimensions of the desktop background.
 setdims
