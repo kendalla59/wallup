@@ -265,6 +265,9 @@ function checkdims {
 if [[ ! -f "$WPFILE" ]]; then
     getrandom
     cp "$WPNEXT" "$WPFILE"
+
+    # Do an immediate update.
+    WPWAIT=0
 fi
 
 # On startup we don't know the origin of any cached images.
@@ -273,6 +276,12 @@ WPNEXT2="(Cached Image 2)"
 
 # Make sure we are using the "spanned" background option.
 gsettings set org.gnome.desktop.background picture-options 'spanned'
+
+# Kick out any cached gsettings file data from a previous run.
+gsettings set org.gnome.desktop.background picture-uri file://"$WPFILE"-NONE
+gsettings set org.gnome.desktop.background picture-uri-dark file://"$WPFILE"-NONE
+
+# Set the background file we will be using for the duration of this run.
 gsettings set org.gnome.desktop.background picture-uri file://"$WPFILE"
 gsettings set org.gnome.desktop.background picture-uri-dark file://"$WPFILE"
 
@@ -374,6 +383,11 @@ while true; do
                 convert -size ${WPB4[0]}x${WPB4[1]} xc:black .wblank4.png
                 convert .wall2.png .wblank4.png $WPAPPBLN .wall2.png
             fi
+        fi
+        # On a new startup the two wallpaper images are the same,
+        # so schedule an immediate refresh so they become different.
+        if [[ $WPNEXT1 == $WPNEXT2 ]]; then
+            WPWAIT=0
         fi
 
         convert .wall1.png .wall2.png $WPAPPEND .wallpaper.png
